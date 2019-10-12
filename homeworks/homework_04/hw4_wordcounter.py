@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from multiprocessing import Process, Manager
+from multiprocessing import Manager, Pool
 import os
 
 
@@ -19,20 +19,17 @@ def word_count_inference(path_to_dir):
     manager = Manager()
     result = manager.dict()
     files = os.listdir(path_to_dir)
-    jobs = []
-    for file in files:
-        job = Process(target=worker, args=(path_to_dir, file, result))
-        jobs.append(job)
-        job.start()
-    for job in jobs:
-        job.join()
+    optimal_proc_cnt = len(files) if (os.cpu_count() > len(files)) else os.cpu_count()
+    pool = Pool(optimal_proc_cnt)
+    args_for_map = map(lambda x: {'path_to_dir': path_to_dir, 'file': x, 'result': result}, files)
+    pool.map(worker, args_for_map)
     result['total'] = sum(result.values())
     return result
 
 
-def worker(path_to_dir, file, result):
-    with open(path_to_dir + '/' + file) as f:
+def worker(params):
+    with open(os.path.join(params['path_to_dir'], params['file'])) as f:
         count = 0
         for line in f.readlines():
             count += len(line.split())
-        result[file] = count
+        params['result'][params['file']] = count
